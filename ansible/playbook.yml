@@ -1,5 +1,5 @@
 ---
-- name: Configure the Student Notes application on Fedora using Ansible
+- name: Configure the Student Notes application on Ubuntu using Ansible
   hosts: devops_targets
   become: true
   gather_facts: true
@@ -30,22 +30,22 @@
     # 1. Environment Preparation                                           #
     # ------------------------------------------------------------------ #
     - name: Install required packages
-      ansible.builtin.dnf:
+      ansible.builtin.apt:
         name:
           - git
           - nginx
           - python3
           - python3-pip
+          - python3-venv
           - curl
-          - policycoreutils
-          - libselinux-utils
         state: present
+        update_cache: true
 
     - name: Create application system user
       ansible.builtin.user:
         name: "{{ app_user }}"
         system: true
-        shell: /sbin/nologin
+        shell: /usr/sbin/nologin
         create_home: false
 
     # ------------------------------------------------------------------ #
