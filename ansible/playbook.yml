@@ -1,0 +1,274 @@
+---
+- name: Configure the Student Notes application on Fedora using Ansible
+  hosts: devops_targets
+  become: true
+  gather_facts: true
+
+  vars:
+    app_user: studentnotes
+    app_version: "1.0"
+    # Optional: set repo_url to clone from GitHub
+    # e.g. -e repo_url=https://github.com/<you>/<repo>.git
+    repo_url: ""
+    repo_branch: main
+    repo_checkout: /opt/studentnotes-src
+    src_dir: "{{ (repo_checkout ~ '/app') if repo_url | length > 0 else (playbook_dir ~ '/../app') }}"
+    k8s_src: "{{ (repo_checkout ~ '/k8s') if repo_url | length > 0 else (playbook_dir ~ '/../k8s') }}"
+    deploy_root: /opt/studentnotes
+    backend_dir: /opt/studentnotes/backend
+    venv_dir: /opt/studentnotes/venv
+    data_dir: /var/lib/studentnotes
+    frontend_root: /var/www/studentnotes
+    staging_dir: /opt/studentnotes/deployment-artifacts
+    backend_service_name: studentnotes-backend
+    backend_port: 5000
+    frontend_port: 80
+
+  tasks:
+
+    # ------------------------------------------------------------------ #
+    # 1. Environment Preparation                                           #
+    # ------------------------------------------------------------------ #
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name:
+          - git
+          - nginx
+          - python3
+          - python3-pip
+          - curl
+          - policycoreutils
+          - libselinux-utils
+        state: present
+
+    - name: Create application system user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        system: true
+        shell: /sbin/nologin
+        create_home: false
+
+    # ------------------------------------------------------------------ #
+    # 2. Source Retrieval (optional GitHub clone)                         #
+    # ------------------------------------------------------------------ #
+    - name: Clone or update application repository from GitHub
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_checkout }}"
+        version: "{{ repo_branch }}"
+        force: false
+      when: repo_url | length > 0
+
+    # ------------------------------------------------------------------ #
+    # 3. Directory Creation                                                #
+    # ------------------------------------------------------------------ #
+    - name: Create application directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ deploy_root }}",  owner: root,              mode: "0755" }
+        - { path: "{{ backend_dir }}",  owner: root,              mode: "0755" }
+        - { path: "{{ data_dir }}",     owner: "{{ app_user }}",  mode: "0750" }
+        - { path: "{{ frontend_root }}", owner: root,             mode: "0755" }
+        - { path: "{{ staging_dir }}",  owner: root,              mode: "0755" }
+
+    # ------------------------------------------------------------------ #
+    # 4. Backend Deployment                                                #
+    # ------------------------------------------------------------------ #
+    - name: Copy backend source files
+      ansible.builtin.copy:
+        src: "{{ src_dir }}/backend/"
+        dest: "{{ backend_dir }}/"
+        remote_src: "{{ repo_url | length > 0 }}"
+        owner: root
+        group: root
+        mode: preserve
+        directory_mode: "0755"
+      notify: Restart Student Notes backend
+
+    - name: Create Python virtual environment and install Flask requirements
+      ansible.builtin.pip:
+        requirements: "{{ backend_dir }}/requirements.txt"
+        virtualenv: "{{ venv_dir }}"
+        virtualenv_command: /usr/bin/python3 -m venv
+      notify: Restart Student Notes backend
+
+    - name: Install systemd service unit for Flask backend
+      ansible.builtin.template:
+        src: studentnotes.service.j2
+        dest: "/etc/systemd/system/{{ backend_service_name }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Student Notes backend
+
+    # ------------------------------------------------------------------ #
+    # 5. Frontend + Nginx Configuration                                    #
+    # ------------------------------------------------------------------ #
+    - name: Create Nginx web root directory
+      ansible.builtin.file:
+        path: "{{ frontend_root }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy frontend HTML to Nginx web root
+      ansible.builtin.copy:
+        src: "{{ src_dir }}/frontend/index.html"
+        dest: "{{ frontend_root }}/index.html"
+        remote_src: "{{ repo_url | length > 0 }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Nginx
+
+    - name: Restore SELinux labels on frontend web content
+      ansible.builtin.command:
+        argv: [restorecon, -Rv, "{{ frontend_root }}"]
+      changed_when: false
+      failed_when: false
+
+    - name: Check whether SELinux allows Nginx network connections
+      ansible.builtin.command:
+        argv: [getsebool, httpd_can_network_connect]
+      register: sebool
+      changed_when: false
+      failed_when: false
+
+    - name: Allow Nginx to proxy to the Flask backend (SELinux boolean)
+      ansible.builtin.command:
+        argv: [setsebool, -P, httpd_can_network_connect, "on"]
+      when: sebool.rc == 0 and ('--> off' in sebool.stdout)
+      changed_when: true
+
+    - name: Write Nginx configuration (frontend serving + reverse proxy)
+      ansible.builtin.template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+      notify: Restart Nginx
+
+    - name: Validate Nginx configuration syntax
+      ansible.builtin.command:
+        argv: [nginx, -t]
+      changed_when: false
+
+    - name: Flush pending service restart handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start Flask backend service
+      ansible.builtin.systemd:
+        name: "{{ backend_service_name }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Enable and start Nginx service
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+
+    # ------------------------------------------------------------------ #
+    # 6. Stage Kubernetes Artifacts (not applied to any cluster)          #
+    # ------------------------------------------------------------------ #
+    - name: Find Kubernetes manifest files
+      ansible.builtin.find:
+        paths: "{{ k8s_src }}"
+        patterns: "*.yaml"
+      register: k8s_files
+
+    - name: Stage Kubernetes manifests to deployment-artifacts directory
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ staging_dir }}/{{ item.path | basename }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ k8s_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    # ------------------------------------------------------------------ #
+    # 7. Endpoint Verification                                             #
+    # ------------------------------------------------------------------ #
+    - name: Verify Flask backend health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ backend_port }}/health"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: backend_health
+      until: backend_health.status | default(0) == 200
+      retries: 15
+      delay: 2
+
+    - name: Verify frontend is served through Nginx
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ frontend_port }}/"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: frontend_check
+
+    - name: Verify API info endpoint through Nginx proxy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ frontend_port }}/api/info"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: api_info_check
+
+    - name: Verify notes list endpoint through Nginx proxy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ frontend_port }}/api/notes"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: api_notes_check
+
+    # ------------------------------------------------------------------ #
+    # 8. Report Generation                                                 #
+    # ------------------------------------------------------------------ #
+    - name: Generate Ansible application preparation and runtime report
+      ansible.builtin.template:
+        src: report.txt.j2
+        dest: "{{ staging_dir }}/ANSIBLE_PREPARATION_REPORT.txt"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Display application verification summary
+      ansible.builtin.debug:
+        msg:
+          - "Frontend URL: http://127.0.0.1:{{ frontend_port }}/"
+          - "Backend health: {{ backend_health.status }}"
+          - "Frontend HTTP status: {{ frontend_check.status }}"
+          - "API /api/info status: {{ api_info_check.status }}"
+          - "API /api/notes status: {{ api_notes_check.status }}"
+          - "Kubernetes manifests detected: {{ k8s_files.matched }}"
+          - "Local application configuration completed successfully."
+
+  # -------------------------------------------------------------------- #
+  # Handlers                                                               #
+  # -------------------------------------------------------------------- #
+  handlers:
+    - name: Restart Student Notes backend
+      ansible.builtin.systemd:
+        name: "{{ backend_service_name }}"
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

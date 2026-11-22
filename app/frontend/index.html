@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Notes</title>
+<style>
+/* ── Reset & base ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--accent:#7c3aed;--accent2:#6d28d9;
+  --green:#238636;--red:#da3633;--blue:#1f6feb;--yellow:#d29922;
+  --radius:8px;--shadow:0 4px 24px rgba(0,0,0,.4);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Sidebar layout ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;height:100vh;flex-shrink:0}
+.main{flex:1;padding:28px 32px;overflow-y:auto;max-width:900px}
+
+/* ── Sidebar ── */
+.logo{display:flex;align-items:center;gap:10px;padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.logo-icon{font-size:1.6rem}
+.logo h1{font-size:1.1rem;color:var(--text);font-weight:700}
+.logo p{font-size:.72rem;color:var(--muted)}
+.nav-label{font-size:.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.08em;padding:0 20px;margin:16px 0 6px}
+.nav-btn{width:100%;text-align:left;padding:8px 20px;background:none;border:none;
+  color:var(--muted);cursor:pointer;font-size:.88rem;border-radius:0;transition:all .15s;
+  display:flex;align-items:center;gap:8px}
+.nav-btn:hover,.nav-btn.active{background:#7c3aed22;color:var(--text)}
+.nav-btn.active{border-right:2px solid var(--accent)}
+.nav-btn .badge{margin-left:auto;background:var(--surface2);color:var(--muted);
+  font-size:.7rem;padding:1px 7px;border-radius:999px}
+.stat-cards{padding:16px 20px 0;margin-top:auto;border-top:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;margin-bottom:10px}
+.stat{text-align:center}
+.stat .n{font-size:1.3rem;font-weight:700;color:var(--accent)}
+.stat .l{font-size:.68rem;color:var(--muted)}
+
+/* ── Top bar ── */
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.topbar h2{font-size:1.3rem;font-weight:700;flex:1}
+.search-wrap{position:relative}
+.search-wrap input{padding:8px 12px 8px 34px;border-radius:var(--radius);border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:.88rem;width:220px;outline:none;transition:.2s}
+.search-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #7c3aed22}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem}
+.btn{padding:8px 16px;border:none;border-radius:var(--radius);cursor:pointer;font-size:.85rem;
+  font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-sm{padding:5px 10px;font-size:.78rem}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+.btn-red{background:#da363322;color:#f85149;border:1px solid #da363344}
+.btn-red:hover{background:var(--red);color:#fff}
+.btn-blue{background:#1f6feb22;color:#58a6ff;border:1px solid #1f6feb44}
+.btn-blue:hover{background:var(--blue);color:#fff}
+.btn-yellow{background:#d2992222;color:#f0c040;border:1px solid #d2992244}
+.btn-yellow:hover{background:var(--yellow);color:#000}
+
+/* ── Status bar ── */
+.status-bar{background:#1f6feb18;border:1px solid #1f6feb33;border-radius:var(--radius);
+  padding:8px 14px;font-size:.8rem;color:#58a6ff;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.status-bar.error{background:#da363318;border-color:#da363333;color:#f85149}
+.dot{width:7px;height:7px;border-radius:50%;background:#3fb950;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Add note form ── */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:28px}
+.form-card h3{font-size:.95rem;color:var(--text);margin-bottom:14px;font-weight:600}
+.form-row{display:grid;grid-template-columns:1fr 1fr 120px;gap:10px;margin-bottom:10px}
+.form-row2{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px}
+input,textarea,select{width:100%;padding:9px 12px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--surface2);color:var(--text);
+  font-size:.88rem;outline:none;font-family:inherit;transition:.2s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #7c3aed22}
+textarea{height:90px;resize:vertical;line-height:1.5}
+select option{background:var(--surface2)}
+
+/* ── Notes grid ── */
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.note-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;position:relative;transition:all .2s;display:flex;flex-direction:column}
+.note-card:hover{border-color:#7c3aed66;box-shadow:0 2px 16px #7c3aed18;transform:translateY(-1px)}
+.note-card.pinned{border-left:3px solid var(--accent)}
+
+/* color themes */
+.note-card.c-purple{background:#1a1030;border-color:#7c3aed55}
+.note-card.c-blue  {background:#0d1f38;border-color:#1f6feb55}
+.note-card.c-green {background:#0d2318;border-color:#23863655}
+.note-card.c-red   {background:#2a1010;border-color:#da363355}
+.note-card.c-yellow{background:#221d0a;border-color:#d2992255}
+
+.pin-badge{position:absolute;top:10px;right:10px;font-size:.68rem;background:var(--accent);
+  color:#fff;padding:2px 8px;border-radius:999px}
+.note-subject{font-weight:700;font-size:.9rem;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.subject-pill{font-size:.7rem;padding:2px 8px;border-radius:999px;font-weight:600}
+.note-content{color:#94a3b8;font-size:.85rem;line-height:1.6;flex:1;
+  white-space:pre-wrap;word-break:break-word;margin-bottom:12px}
+.note-meta{font-size:.7rem;color:var(--muted);margin-bottom:10px}
+.note-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+
+/* ── Edit modal ── */
+.overlay{position:fixed;inset:0;background:#000a;display:flex;align-items:center;
+  justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:.2s}
+.overlay.show{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:24px;width:min(520px,95vw);box-shadow:var(--shadow);transform:translateY(10px);transition:.2s}
+.overlay.show .modal{transform:translateY(0)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-header h3{font-size:1rem;font-weight:700}
+.close-btn{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;
+  line-height:1;padding:2px 6px;border-radius:4px}
+.close-btn:hover{background:var(--surface2);color:var(--text)}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:3rem;margin-bottom:12px}
+.empty p{font-size:.95rem}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#238636;color:#fff;
+  padding:10px 18px;border-radius:var(--radius);font-size:.85rem;font-weight:600;
+  box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.3s;z-index:200}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:var(--red)}
+
+/* ── Responsive ── */
+@media(max-width:680px){
+  .sidebar{display:none}
+  .main{padding:16px}
+  .form-row{grid-template-columns:1fr}
+  .notes-grid{grid-template-columns:1fr}
+  .search-wrap input{width:160px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📚</div>
+      <div>
+        <h1>Student Notes</h1>
+        <p>DevOps Demo App</p>
+      </div>
+    </div>
+
+    <div class="nav-label">Subjects</div>
+    <button class="nav-btn active" id="nav-all" onclick="filterSubject('')">
+      📋 All Notes <span class="badge" id="badge-all">0</span>
+    </button>
+    <div id="subject-nav"></div>
+
+    <div class="nav-label">Quick</div>
+    <button class="nav-btn" onclick="filterSubject('__pinned__')">
+      📌 Pinned
+    </button>
+
+    <div class="stat-cards">
+      <div class="stat-row">
+        <div class="stat"><div class="n" id="s-total">0</div><div class="l">Notes</div></div>
+        <div class="stat"><div class="n" id="s-pinned">0</div><div class="l">Pinned</div></div>
+        <div class="stat"><div class="n" id="s-subj">0</div><div class="l">Subjects</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+    <div class="topbar">
+      <h2 id="page-title">All Notes</h2>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-inp" placeholder="Search notes…" oninput="onSearch()">
+      </div>
+      <button class="btn btn-primary" onclick="openAdd()">＋ New Note</button>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+      <span class="dot"></span> Connecting to backend…
+    </div>
+
+    <!-- Add / Edit form (inline, hidden by default) -->
+    <div class="form-card" id="form-card" style="display:none">
+      <h3 id="form-title">✏️ Add New Note</h3>
+      <div class="form-row">
+        <div>
+          <label>Subject *</label>
+          <input type="text" id="f-subject" placeholder="e.g. Mathematics, OS, DBMS" list="subject-list">
+          <datalist id="subject-list"></datalist>
+        </div>
+        <div>
+          <label>Color Label</label>
+          <select id="f-color">
+            <option value="default">⬜ Default</option>
+            <option value="purple">🟣 Purple</option>
+            <option value="blue">🔵 Blue</option>
+            <option value="green">🟢 Green</option>
+            <option value="red">🔴 Red</option>
+            <option value="yellow">🟡 Yellow</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:end;gap:6px">
+          <div>
+            <label>Pin?</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:8px">
+              <input type="checkbox" id="f-pin" style="width:auto"> Pinned
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row2">
+        <div>
+          <label>Content *</label>
+          <textarea id="f-content" placeholder="Write your notes here…"></textarea>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-self:end">
+          <button class="btn btn-primary" onclick="submitForm()">💾 Save</button>
+          <button class="btn btn-ghost" onclick="closeForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes grid -->
+    <div class="notes-grid" id="notes-grid"></div>
+    <div class="empty" id="empty-state" style="display:none">
+      <div class="empty-icon">📭</div>
+      <p>No notes found. Add your first note!</p>
+    </div>
+  </main>
+</div>
+
+<!-- Edit modal -->
+<div class="overlay" id="edit-overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ Edit Note</h3>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div>
+      <label>Subject *</label>
+      <input type="text" id="e-subject" style="margin-bottom:10px" list="subject-list">
+      <label>Color Label</label>
+      <select id="e-color" style="margin-bottom:10px">
+        <option value="default">⬜ Default</option>
+        <option value="purple">🟣 Purple</option>
+        <option value="blue">🔵 Blue</option>
+        <option value="green">🟢 Green</option>
+        <option value="red">🔴 Red</option>
+        <option value="yellow">🟡 Yellow</option>
+      </select>
+      <label>Content *</label>
+      <textarea id="e-content" style="margin-bottom:14px;height:120px"></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveEdit()">💾 Save Changes</button>
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+const api = "/api/notes";
+let allNotes = [];
+let editingId = null;
+let activeSubject = "";
+let searchTerm = "";
+
+const COLORS = {default:"",purple:"c-purple",blue:"c-blue",green:"c-green",red:"c-red",yellow:"c-yellow"};
+const SUBJECT_COLORS = ["#7c3aed","#1f6feb","#238636","#d29922","#da3633","#8250df","#0969da","#1a7f37"];
+
+// ── Init ───────────────────────────────────────────────────────
+loadInfo();
+loadNotes();
+
+// ── API calls ──────────────────────────────────────────────────
+async function loadInfo() {
+  try {
+    const r = await fetch("/api/info");
+    const d = await r.json();
+    const sb = document.getElementById("status-bar");
+    sb.innerHTML = `<span class="dot"></span> Backend OK — ${d.app} v${d.version} · host: ${d.host}`;
+    sb.classList.remove("error");
+    if (d.stats) {
+      document.getElementById("s-total").textContent  = d.stats.total;
+      document.getElementById("s-pinned").textContent = d.stats.pinned;
+      document.getElementById("s-subj").textContent   = d.stats.subjects;
+    }
+  } catch {
+    const sb = document.getElementById("status-bar");
+    sb.innerHTML = "⚠️ Backend unreachable";
+    sb.classList.add("error");
+  }
+}
+
+async function loadNotes() {
+  try {
+    const r = await fetch(api);
+    allNotes = await r.json();
+    renderSidebar();
+    renderNotes();
+    loadInfo();
+  } catch (e) { console.error(e); }
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function renderSidebar() {
+  // subject list
+  const counts = {};
+  allNotes.forEach(n => counts[n.subject] = (counts[n.subject]||0)+1);
+  document.getElementById("badge-all").textContent = allNotes.length;
+
+  const nav = document.getElementById("subject-nav");
+  nav.innerHTML = "";
+  const dl = document.getElementById("subject-list");
+  dl.innerHTML = "";
+
+  Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([s,c],i) => {
+    const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
+    const btn = document.createElement("button");
+    btn.className = "nav-btn" + (activeSubject===s?" active":"");
+    btn.innerHTML = `<span style="color:${color}">●</span> ${esc(s)} <span class="badge">${c}</span>`;
+    btn.onclick = () => filterSubject(s);
+    nav.appendChild(btn);
+
+    const opt = document.createElement("option");
+    opt.value = s;
+    dl.appendChild(opt);
+  });
+}
+
+function renderNotes() {
+  let notes = [...allNotes];
+
+  if (activeSubject === "__pinned__") {
+    notes = notes.filter(n => n.pinned);
+    document.getElementById("page-title").textContent = "📌 Pinned Notes";
+  } else if (activeSubject) {
+    notes = notes.filter(n => n.subject === activeSubject);
+    document.getElementById("page-title").textContent = activeSubject;
+  } else {
+    document.getElementById("page-title").textContent = "All Notes";
+  }
+
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    notes = notes.filter(n =>
+      n.subject.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)
+    );
+  }
+
+  const grid  = document.getElementById("notes-grid");
+  const empty = document.getElementById("empty-state");
+  grid.innerHTML = "";
+
+  if (notes.length === 0) { empty.style.display="block"; return; }
+  empty.style.display = "none";
+
+  notes.forEach(n => {
+    const card = document.createElement("div");
+    const colorClass = COLORS[n.color] || "";
+    card.className = "note-card " + colorClass + (n.pinned?" pinned":"");
+
+    const subjectColor = SUBJECT_COLORS[
+      Object.keys(
+        allNotes.reduce((a,x)=>{a[x.subject]=1;return a},{}))
+        .sort().indexOf(n.subject) % SUBJECT_COLORS.length
+    ];
+
+    const dateStr = n.updated_at
+      ? new Date(n.updated_at+"Z").toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})
+      : "";
+
+    card.innerHTML = `
+      ${n.pinned?'<span class="pin-badge">📌 Pinned</span>':""}
+      <div class="note-subject">
+        <span class="subject-pill" style="background:${subjectColor}22;color:${subjectColor}">${esc(n.subject)}</span>
+      </div>
+      <div class="note-content">${esc(n.content)}</div>
+      <div class="note-meta">Updated ${dateStr}</div>
+      <div class="note-actions">
+        <button class="btn btn-sm btn-blue" onclick="openEdit(${n.id})">✏️ Edit</button>
+        <button class="btn btn-sm btn-yellow" onclick="togglePin(${n.id},${n.pinned})">${n.pinned?"Unpin":"📌 Pin"}</button>
+        <button class="btn btn-sm btn-red" onclick="deleteNote(${n.id})">🗑️ Delete</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ── Interactions ───────────────────────────────────────────────
+function filterSubject(s) {
+  activeSubject = s;
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  if (!s) document.getElementById("nav-all").classList.add("active");
+  renderSidebar();
+  renderNotes();
+}
+
+function onSearch() {
+  searchTerm = document.getElementById("search-inp").value.trim();
+  renderNotes();
+}
+
+// ── Form (Add) ─────────────────────────────────────────────────
+function openAdd() {
+  editingId = null;
+  document.getElementById("form-title").textContent = "✏️ Add New Note";
+  document.getElementById("f-subject").value = activeSubject && activeSubject!=="__pinned__" ? activeSubject : "";
+  document.getElementById("f-content").value = "";
+  document.getElementById("f-color").value   = "default";
+  document.getElementById("f-pin").checked   = false;
+  document.getElementById("form-card").style.display = "block";
+  document.getElementById("f-subject").focus();
+  document.getElementById("form-card").scrollIntoView({behavior:"smooth"});
+}
+
+function closeForm() {
+  document.getElementById("form-card").style.display = "none";
+}
+
+async function submitForm() {
+  const subject = document.getElementById("f-subject").value.trim();
+  const content = document.getElementById("f-content").value.trim();
+  const color   = document.getElementById("f-color").value;
+  const pinned  = document.getElementById("f-pin").checked;
+  if (!subject || !content) { showToast("Subject and content are required","error"); return; }
+  const r = await fetch(api, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({subject,content,color,pinned})
+  });
+  if (r.ok) {
+    closeForm();
+    showToast("Note saved ✓");
+    loadNotes();
+  } else {
+    showToast("Failed to save","error");
+  }
+}
+
+// ── Modal (Edit) ───────────────────────────────────────────────
+function openEdit(id) {
+  const n = allNotes.find(x => x.id===id);
+  if (!n) return;
+  editingId = id;
+  document.getElementById("e-subject").value = n.subject;
+  document.getElementById("e-content").value = n.content;
+  document.getElementById("e-color").value   = n.color || "default";
+  document.getElementById("edit-overlay").classList.add("show");
+}
+
+function closeModal() {
+  document.getElementById("edit-overlay").classList.remove("show");
+  editingId = null;
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById("edit-overlay")) closeModal();
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const subject = document.getElementById("e-subject").value.trim();
+  const content = document.getElementById("e-content").value.trim();
+  const color   = document.getElementById("e-color").value;
+  if (!subject || !content) { showToast("Subject and content required","error"); return; }
+  const r = await fetch(api+"/"+editingId, {
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({subject,content,color})
+  });
+  if (r.ok) {
+    closeModal();
+    showToast("Note updated ✓");
+    loadNotes();
+  } else {
+    showToast("Update failed","error");
+  }
+}
+
+// ── Actions ────────────────────────────────────────────────────
+async function togglePin(id, pinned) {
+  await fetch(api+"/"+id,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({pinned:!pinned})
+  });
+  showToast(pinned?"Unpinned":"📌 Pinned");
+  loadNotes();
+}
+
+async function deleteNote(id) {
+  if (!confirm("Delete this note? This cannot be undone.")) return;
+  const r = await fetch(api+"/"+id,{method:"DELETE"});
+  if (r.ok) { showToast("Note deleted"); loadNotes(); }
+  else showToast("Delete failed","error");
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+let toastTimer;
+function showToast(msg, type="ok") {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (type==="error"?" error":"");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.classList.remove("show"); }, 2800);
+}
+
+// keyboard shortcut: N = new note
+document.addEventListener("keydown", e => {
+  if (e.key==="n" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) {
+    openAdd();
+  }
+  if (e.key==="Escape") { closeForm(); closeModal(); }
+});
+</script>
+</body>
+</html>

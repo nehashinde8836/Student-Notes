@@ -1,0 +1,14 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r app/backend/requirements.txt ansible-core
+      - run: python -m py_compile app/backend/app.py
+      - run: cd ansible && ansible-playbook playbook.yml --syntax-check
+      - run: docker build -t studentnotes-backend:ci app/backend
+      - run: docker build -t studentnotes-frontend:ci app/frontend

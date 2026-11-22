@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studentnotes-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: studentnotes-frontend}
+  template:
+    metadata:
+      labels: {app: studentnotes-frontend}
+    spec:
+      containers:
+        - name: frontend
+          image: studentnotes-frontend:1.0
+          ports: [{containerPort: 80}]

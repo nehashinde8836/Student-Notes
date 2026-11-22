@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: studentnotes-frontend
+spec:
+  selector: {app: studentnotes-frontend}
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Student Notes Flask API (Gunicorn)
+After=network.target
+
+[Service]
+User={{ app_user }}
+Group={{ app_user }}
+WorkingDirectory={{ backend_dir }}
+Environment=NOTES_DB={{ data_dir }}/notes.db
+Environment=APP_VERSION={{ app_version }}
+ExecStart={{ venv_dir }}/bin/gunicorn --bind 127.0.0.1:{{ backend_port }} --workers 2 app:app
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths={{ data_dir }}
+
+[Install]
+WantedBy=multi-user.target

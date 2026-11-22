@@ -1,0 +1,39 @@
+ANSIBLE APPLICATION PREPARATION REPORT
+======================================
+Project: Student Notes - Flask API + Nginx (DevOps Case Study)
+Managed host: {{ inventory_hostname }}
+OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
+Source directory: {{ src_dir }}
+Backend directory: {{ backend_dir }}
+Frontend web root: {{ frontend_root }}
+Staging directory: {{ staging_dir }}
+Kubernetes YAML manifests detected: {{ k8s_files.matched }}
+
+Application components:
+- Frontend: static HTML/CSS/JavaScript served by Nginx (port {{ frontend_port }})
+- Backend: Python Flask API run by Gunicorn under systemd (port {{ backend_port }})
+- Data: SQLite database at {{ data_dir }}/notes.db
+- Kubernetes: Deployments, Services and Ingress (staged, not applied to cluster)
+- CI: GitHub Actions workflow
+
+Ansible actions performed:
+- Ensured Git, Nginx and Python packages are installed
+- Created system user '{{ app_user }}' for the backend service
+- Copied backend source and installed Flask requirements in virtual environment
+- Created and enabled systemd service '{{ backend_service_name }}'
+- Deployed frontend files to Nginx web root {{ frontend_root }}
+- Configured Nginx reverse proxy to forward /api/ and /health to Flask
+- Restored SELinux labels on web content
+- Staged Kubernetes manifests to {{ staging_dir }}
+- Verified backend health, frontend HTTP response and API routing
+
+Verification results:
+- Backend /health HTTP status: {{ backend_health.status }}
+- Frontend HTTP status: {{ frontend_check.status }}
+- API /api/info status: {{ api_info_check.status }}
+- API /api/notes status: {{ api_notes_check.status }}
+
+Execution boundary:
+The frontend and Flask backend were run locally on Fedora.
+Kubernetes manifests were staged and validated for a later cluster deployment.
+No Kubernetes cluster deployment was performed in this assignment.

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studentnotes-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: studentnotes-backend}
+  template:
+    metadata:
+      labels: {app: studentnotes-backend}
+    spec:
+      containers:
+        - name: backend
+          image: studentnotes-backend:1.0
+          ports: [{containerPort: 5000}]
+          env:
+            - name: NOTES_DB
+              value: /tmp/notes.db
+            - name: APP_VERSION
+              value: "1.0"
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            initialDelaySeconds: 5
+            periodSeconds: 10
